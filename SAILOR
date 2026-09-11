@@ -1,0 +1,77 @@
+module load conda 
+
+mkdir GSF2183
+
+cd GSF2183
+
+mkdir genome
+
+cd genome
+
+wget "$ASSEMBLY" -O caenorhabditis_elegans.genomic.fa.gz
+gunzip caenorhabditis_elegans.genomic.fa.gz
+scp caenorhabditis_elegans.genomic.fa /N/slate/ealamb/GSF2183/genome/annotation.gtf
+rm -r *genomic.fa
+
+mkdir -p genome/index
+
+cd /N/project/HundleyLab/GSF2183
+
+scp GSF2183* /N/slate/ealamb/GSF2183
+
+cd /N/slate/ealamb/GSF2183
+STAR \
+  --runThreadN 4 \
+  --runMode genomeGenerate \
+  --genomeDir genome/index \
+  --genomeFastaFiles genome/assembly.fasta \
+  --sjdbGTFfile genome/annotation.gtf \
+  --genomeSAindexNbases 12
+
+###########################
+## Align Reads to Genome ##
+###########################
+
+# Create an output directory for aligned reads.
+
+mkdir -p results/aligned
+
+# Align the reads.
+
+FASTQ=$GSF2183*
+
+for FASTQ in ${FASTQ[@]}; do
+  PREFIX=results/aligned/$(basename $FASTQ .fastq)_
+  STAR \
+    --runThreadN 8 \
+    --outFilterMultimapNmax 1 \
+    --outFilterScoreMinOverLread .66 \
+    --outFilterMismatchNmax 10 \
+    --outFilterMismatchNoverLmax .3 \
+    --runMode alignReads \
+    --genomeDir genome/index \
+    --readFilesIn $FASTQ \
+    --outFileNamePrefix $PREFIX \
+    --outSAMattributes All \
+    --outSAMtype BAM SortedByCoordinate
+done
+conda activate rnaseq 
+
+cd /N/slate/ealamb/GSF1440_1/results/aligned
+
+samtools merge -@ 8 /N/slate/ealamb/GSF2183/sailor/GSF2183WTmerged.bam GSF2183-WT-rep-1_S1_R1_001_Aligned.sortedByCoord.out.bam GSF2183-WT-rep-2_S2_R1_001_Aligned.sortedByCoord.out.bam GSF2183-WT-rep-3_S3_R1_001_Aligned.sortedByCoord.out.bam
+samtools merge -@ 8 /N/slate/ealamb/GSF2183/sailor/GSF21836merged.bam GSF2183-adr-2-rep-1_S4_R1_001_Aligned.sortedByCoord.out.bam GSF2183-adr-2-rep-2_S5_R1_001_Aligned.sortedByCoord.out.bam GSF2183-adr-2-rep-3_S6_R1_001_Aligned.sortedByCoord.out.bam
+
+snakemake --snakefile /N/slate/ealamb/GSF2183/sailor/workflow_sailor/Snakefile --configfile /N/slate/ealamb/GSF2183/sailor/WTmerged.json --use-singularity --singularity-args '--bind /N/slate/ealamb/GSF2183 --bind /N/slate/ealamb/GSF2183/genome --bind /N/slate/ealamb/GSF2183/sailor/workflow_sailor/scripts --bind /N/slate/ealamb/GSF2183/sailor/workflow_sailor --bind /N/slate/ealamb/GSF2183/results/WTflareM' -j1
+snakemake --snakefile /N/slate/ealamb/GSF2183/sailor/workflow_sailor/Snakefile --configfile /N/slate/ealamb/GSF2183/sailor/6merged.json --use-singularity --singularity-args '--bind /N/slate/ealamb/GSF2183 --bind /N/slate/ealamb/GSF2183/genome --bind /N/slate/ealamb/GSF2183/sailor/workflow_sailor/scripts --bind /N/slate/ealamb/GSF2183/sailor/workflow_sailor --bind /N/slate/ealamb/GSF2183/results/6flareM' -j1
+
+
+python3 annotator.sailor.py --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.gtf --fwd GSF2183WTmerged.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --rev GSF2183WTmerged.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --wb c.elegans.WS275.annotation.final.bed --o /N/slate/ealamb/GSF2183/sailor/WTmerged.annotated.sites.csv
+python3 annotator.sailor.py --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.gtf --fwd GSF21836merged.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --rev GSF21836merged.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --wb c.elegans.WS275.annotation.final.bed --o /N/slate/ealamb/GSF2183/sailor/6merged.annotated.sites.csv
+
+
+python3 newannotator.py --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.gtf --fwd GSF2183WTmerged.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --rev GSF2183WTmerged.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --wb c.elegans.WS275.annotation.final.bed --o /N/slate/ealamb/GSF2183/sailor/newannotationWTmerged.annotated.sites.csv
+python3 newannotator.py --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.gtf --fwd GSF21836merged.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --rev GSF21836merged.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --wb c.elegans.WS275.annotation.final.bed --o /N/slate/ealamb/GSF2183/sailor/newannotation6merged.annotated.sites.csv
+
+
+scp ealamb@quartz.uits.iu.edu:/N/slate/ealamb/GSF1440_1/results/flareM205/*.csv ~/Desktop/
