@@ -1,0 +1,72 @@
+#Went here to aquire raw data from CGB: https://lims.cgb.iu.edu/outbox/HundleyLab/
+  ### User: HHundley
+  ### Pass: 9MJ31
+
+#In personal computer terminal
+scp /Users/emmalamb/desktop/archive-GSF4521.run1.tar ealamb@quartz.uits.iu.edu:/N/project/HundleyLab/DIRECTORYNAME/
+
+#In ThinLinc
+cd /N/scratch/ealamb 
+mkdir DIRECTORYNAME
+
+scp /N/project/HundleyLab/GSF4521/archive-GSF4521.run1.tar /N/scratch/ealamb/DIRECTORYNAME/
+
+cd DIRECTORYNAME
+tar -xvf archive*
+gunzip *.gz
+rm *.tar
+conda activate rnaseq
+fastqc samplename_001.fastq
+
+
+#Download RefSeq accession GCF_000002985.6 --include gff3,genome to your personal computer and move data to DIRECTORYNAME directory
+
+ASSEMBLY='GCF_000002985.6_WBcel235_genomic.fna'
+ANNOTATION='genomic.gtf'
+mkdir -p genome
+#Move above files to /N/scratch/ealamb/DIRECTORYNAME/genome/
+
+mkdir -p genome/index
+#From /N/scratch/ealamb/DIRECTORYNAME/ run:
+
+
+STAR \
+  --runThreadN 16 \
+  --genomeDir /N/scratch/ealamb/GSF4521/genome/index \
+  --readFilesIn GSF4521-EL-polyA_S34_R1_001.fastq GSF4521-EL-polyA_S34_R2_001.fastq \
+  --outFileNamePrefix polyA. \
+  --alignSJoverhangMin 15 \
+  --outFilterMultimapNmax 20 \
+  --outSAMtype BAM SortedByCoordinate
+
+lws
+
+mkdir bams
+scp *.bam /N/scratch/ealamb/GSF4521/bams/
+
+# Write header to summary file
+echo -e "Filename\tTotal_reads\tDedup_reads\tPercent_duplicates" > bam_dedup_summary.tsv
+
+# Loop through all BAM files
+for i in *.bam; do
+    # Define output deduplicated BAM filename
+    out=${i%.bam}.dedup.bam
+
+    # Count total reads
+    total=$(samtools view -c "$i")
+
+    # Run markdup, save deduplicated BAM
+    samtools markdup -s -r "$i" "$out"
+
+    # Index the deduplicated BAM
+    samtools index "$out"
+
+    # Count reads in deduplicated BAM
+    dedup=$(samtools view -c "$out")
+
+    # Calculate % duplicates
+    dup_percent=$(echo "scale=2; 100*($total-$dedup)/$total" | bc)
+
+    # Append results to summary
+    echo -e "$i\t$total\t$dedup\t$dup_percent%"
+done >> bam_dedup_summary.tsv
