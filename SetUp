@@ -23,12 +23,23 @@ fastqc samplename_001.fastq
 
 ASSEMBLY='GCF_000002985.6_WBcel235_genomic.fna'
 ANNOTATION='genomic.gtf'
-mkdir -p genome
-#Move above files to /N/scratch/ealamb/DIRECTORYNAME/genome/
 
-mkdir -p genome/index
+#Move above files to /N/scratch/ealamb/DIRECTORYNAME/
+
+
+
+#Index genome
+
+STAR \
+  --runThreadN 16 \
+  --runMode genomeGenerate \
+  --genomeDir genome/index \
+  --genomeFastaFiles GCF_000002985.6_WBcel235_genomic.fna \
+  --sjdbGTFfile genomic.gff \
+  --sjdbOverhang 149
 #From /N/scratch/ealamb/DIRECTORYNAME/ run:
 
+#Align reads
 
 STAR \
   --runThreadN 16 \
@@ -39,13 +50,13 @@ STAR \
   --outFilterMultimapNmax 20 \
   --outSAMtype BAM SortedByCoordinate
 
-lws
+
 
 mkdir bams
 scp *.bam /N/scratch/ealamb/GSF4521/bams/
 
 # Write header to summary file
-echo -e "Filename\tTotal_reads\tDedup_reads\tPercent_duplicates" > bam_dedup_summary.tsv
+echo -e "Filename\tTotal_reads\tDedup_reads\tPercent_duplicates" > neural_bam_dedup_summary.tsv
 
 # Loop through all BAM files
 for i in *.bam; do
@@ -69,4 +80,4 @@ for i in *.bam; do
 
     # Append results to summary
     echo -e "$i\t$total\t$dedup\t$dup_percent%"
-done >> bam_dedup_summary.tsv
+done >> neural_bam_dedup_summary.tsv
