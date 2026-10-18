@@ -43,20 +43,304 @@ STAR \
 
 STAR \
   --runThreadN 16 \
-  --genomeDir /N/scratch/ealamb/GSF4521/genome/index \
-  --readFilesIn GSF4521-EL-polyA_S34_R1_001.fastq GSF4521-EL-polyA_S34_R2_001.fastq \
-  --outFileNamePrefix polyA. \
+  --genomeDir /N/scratch/ealamb/GSF4595/genome/genome/index \
+  --readFilesIn wt_s_rep1_R1.fastq wt_s_rep1_R2.fastq \
+  --outFileNamePrefix wt_s_rep1. \
   --alignSJoverhangMin 15 \
-  --outFilterMultimapNmax 20 \
+  --outFilterMultimapNmax 10 \
   --outSAMtype BAM SortedByCoordinate
 
+
+
+
+#!/usr/bin/env python3
+
+from urllib.parse import unquote
+from collections import defaultdict
+
+GFF_FILE = "genome/genomic.gff"
+SAF_FILE = "genome/genomic.saf"
+MAX_EXAMPLES = 20
+
+
+def parse_attributes(attribute_string):
+    """Parse GFF3 attributes separated by semicolons."""
+    attributes = {}
+
+    for item in attribute_string.strip().strip(";").split(";"):
+        if not item or "=" not in item:
+            continue
+
+        key, value = item.split("=", 1)
+        attributes[key] = unquote(value)
+
+    return attributes
+
+
+def parse_dbxref(dbxref_string):
+    """Parse Dbxref entries such as GeneID:123,WormBase:WBGene000123."""
+    result = {}
+
+    for item in dbxref_string.split(","):
+        if ":" in item:
+            key, value = item.split(":", 1)
+            result[key] = value
+
+    return result
+
+
+# Store all annotation records and gene lookup tables.
+features = []
+genes = {}
+
+locus_to_genes = defaultdict(set)
+name_to_genes = defaultdict(set)
+wormbase_to_genes = defaultdict(set)
+geneid_to_genes = defaultdict(set)
+
+with open(GFF_FILE, "r") as gff:
+    for line in gff:
+        if line.startswith("#") or not line.strip():
+            continue
+
+        columns = line.rstrip("\n").split("\t")
+
+        if len(columns) != 9:
+            continue
+
+        attributes = parse_attributes(columns[8])
+
+        record = {
+            "chr": columns[0],
+            "source": columns[1],
+            "type": columns[2],
+            "start": int(columns[3]),
+            "end": int(columns[4]),
+            "strand": columns[6],
+            "attrs": attributes,
+        }
+
+        features.append(record)
+
+        if record["type"] != "gene" or "ID" not in attributes:
+            continue
+
+        gene_id = attributes["ID"]
+        genes[gene_id] = record
+
+        if attributes.get("locus_tag"):
+            locus_to_genes[attributes["locus_tag"]].add(gene_id)
+
+        if attributes.get("gene"):
+            name_to_genes[attributes["gene"]].add(gene_id)
+
+        dbxref = parse_dbxref(attributes.get("Dbxref", ""))
+
+        if dbxref.get("WormBase"):
+            wormbase_to_genes[dbxref["WormBase"]].add(gene_id)
+
+        if dbxref.get("GeneID"):
+            geneid_to_genes[dbxref["GeneID"]].add(gene_id)
+
+
+# Keep all records associated with an ID because GFF3 IDs may recur.
+id_to_records = defaultdict(list)
+
+for record in features:
+    feature_id = record["attrs"].get("ID")
+
+    if feature_id:
+        id_to_records[feature_id].append(record)
+
+
+def unique_gene_from_mapping(mapping, key):
+    """Return a gene ID only if the key identifies exactly one gene."""
+    if not key:
+        return None
+
+    candidates = mapping.get(key, set())
+
+    if len(candidates) == 1:
+        return next(iter(candidates))
+
+    return None
+
+
+def find_gene_by_dbxref(attributes):
+    """Resolve a gene using stable external identifiers."""
+    dbxref = parse_dbxref(attributes.get("Dbxref", ""))
+
+    # Prefer the WormBase stable identifier.
+    candidate = unique_gene_from_mapping(
+        wormbase_to_genes, dbxref.get("WormBase")
+    )
+
+    if candidate:
+        return candidate
+
+    # Fall back to NCBI GeneID only if the mapping is unique.
+    return unique_gene_from_mapping(
+        geneid_to_genes, dbxref.get("GeneID")
+    )
+
+
+def find_gene(record):
+    """Resolve an exon to a gene without guessing ambiguous mappings."""
+    attributes = record["attrs"]
+
+    pending = [
+        parent
+        for parent in attributes.get("Parent", "").split(",")
+        if parent
+    ]
+
+    visited = set()
+
+    while pending:
+        parent_id = pending.pop()
+
+        if parent_id in visited:
+            continue
+
+        visited.add(parent_id)
+
+        # Direct parent is a gene.
+        if parent_id in genes:
+            return parent_id
+
+        # Inspect records associated with this parent ID.
+        for parent_record in id_to_records.get(parent_id, []):
+            parent_attrs = parent_record["attrs"]
+
+            # Try stable identifiers first.
+            candidate = find_gene_by_dbxref(parent_attrs)
+            if candidate:
+                return candidate
+
+            # Try a unique locus tag.
+            candidate = unique_gene_from_mapping(
+                locus_to_genes, parent_attrs.get("locus_tag")
+            )
+            if candidate:
+                return candidate
+
+            # Try a gene name only if it maps to exactly one gene.
+            candidate = unique_gene_from_mapping(
+                name_to_genes, parent_attrs.get("gene")
+            )
+            if candidate:
+                return candidate
+
+            # Continue walking up the GFF3 parent hierarchy.
+            pending.extend(
+                parent
+                for parent in parent_attrs.get("Parent", "").split(",")
+                if parent
+            )
+
+    # Try identifiers directly on the exon.
+    candidate = find_gene_by_dbxref(attributes)
+    if candidate:
+        return candidate
+
+    candidate = unique_gene_from_mapping(
+        locus_to_genes, attributes.get("locus_tag")
+    )
+    if candidate:
+        return candidate
+
+    candidate = unique_gene_from_mapping(
+        name_to_genes, attributes.get("gene")
+    )
+    if candidate:
+        return candidate
+
+    return None
+
+
+# Convert exon features to SAF intervals.
+# Exact duplicate intervals for the same gene are written only once.
+rows = set()
+unresolved_count = 0
+unresolved_examples = []
+total_exons = 0
+
+for record in features:
+    if record["type"] != "exon":
+        continue
+
+    total_exons += 1
+    gene_id = find_gene(record)
+
+    if gene_id is None:
+        unresolved_count += 1
+
+        if len(unresolved_examples) < MAX_EXAMPLES:
+            unresolved_examples.append(record)
+
+        continue
+
+    rows.add((
+        gene_id,
+        record["chr"],
+        record["start"],
+        record["end"],
+        record["strand"],
+    ))
+
+
+# Write SAF format:
+# GeneID    Chr    Start    End    Strand
+with open(SAF_FILE, "w") as output:
+    output.write("GeneID\tChr\tStart\tEnd\tStrand\n")
+
+    for row in sorted(rows):
+        output.write("\t".join(map(str, row)) + "\n")
+
+
+# Print summary.
+resolved_count = total_exons - unresolved_count
+
+print(f"Input GFF3: {GFF_FILE}")
+print(f"Output SAF: {SAF_FILE}")
+print(f"Total exon records: {total_exons}")
+print(f"Resolved exon records: {resolved_count}")
+print(f"Unresolved exon records: {unresolved_count}")
+print(f"Unique SAF intervals written: {len(rows)}")
+
+if total_exons:
+    resolution_rate = 100 * resolved_count / total_exons
+    print(f"Resolution rate: {resolution_rate:.2f}%")
+
+if unresolved_examples:
+    print(f"\nFirst {len(unresolved_examples)} unresolved exon records:")
+
+    for record in unresolved_examples:
+        print(
+            f'{record["chr"]}\t'
+            f'{record["start"]}\t'
+            f'{record["end"]}\t'
+            f'{record["strand"]}\t'
+            f'{record["attrs"]}'
+        )
+
+
+featureCounts \
+  -T 8 \
+  -p --countReadPairs \
+  -F SAF \
+  -a genome/genomic.saf \
+  -o wt_s_counts.txt \
+  wt_s_rep1.Aligned.sortedByCoord.out.bam \
+  wt_s_rep2.Aligned.sortedByCoord.out.bam \
+  wt_s_rep3.Aligned.sortedByCoord.out.bam
 
 
 mkdir bams
 scp *.bam /N/scratch/ealamb/GSF4521/bams/
 
 # Write header to summary file
-echo -e "Filename\tTotal_reads\tDedup_reads\tPercent_duplicates" > neural_bam_dedup_summary.tsv
+echo -e "Filename\tTotal_reads\tDedup_reads\tPercent_duplicates" > wt_adr2_bam_dedup_summary.tsv
 
 # Loop through all BAM files
 for i in *.bam; do
@@ -80,4 +364,4 @@ for i in *.bam; do
 
     # Append results to summary
     echo -e "$i\t$total\t$dedup\t$dup_percent%"
-done >> neural_bam_dedup_summary.tsv
+done >> wt_adr2_bam_dedup_summary.tsv
