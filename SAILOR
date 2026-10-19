@@ -1,20 +1,72 @@
-conda activate rnaseq 
 
-cd /N/slate/ealamb/GSF1440_1/results/aligned
-
-samtools merge -@ 8 /N/slate/ealamb/GSF2183/sailor/GSF2183WTmerged.bam GSF2183-WT-rep-1_S1_R1_001_Aligned.sortedByCoord.out.bam GSF2183-WT-rep-2_S2_R1_001_Aligned.sortedByCoord.out.bam GSF2183-WT-rep-3_S3_R1_001_Aligned.sortedByCoord.out.bam
-samtools merge -@ 8 /N/slate/ealamb/GSF2183/sailor/GSF21836merged.bam GSF2183-adr-2-rep-1_S4_R1_001_Aligned.sortedByCoord.out.bam GSF2183-adr-2-rep-2_S5_R1_001_Aligned.sortedByCoord.out.bam GSF2183-adr-2-rep-3_S6_R1_001_Aligned.sortedByCoord.out.bam
-
-snakemake --snakefile /N/slate/ealamb/GSF2183/sailor/workflow_sailor/Snakefile --configfile /N/slate/ealamb/GSF2183/sailor/WTmerged.json --use-singularity --singularity-args '--bind /N/slate/ealamb/GSF2183 --bind /N/slate/ealamb/GSF2183/genome --bind /N/slate/ealamb/GSF2183/sailor/workflow_sailor/scripts --bind /N/slate/ealamb/GSF2183/sailor/workflow_sailor --bind /N/slate/ealamb/GSF2183/results/WTflareM' -j1
-snakemake --snakefile /N/slate/ealamb/GSF2183/sailor/workflow_sailor/Snakefile --configfile /N/slate/ealamb/GSF2183/sailor/6merged.json --use-singularity --singularity-args '--bind /N/slate/ealamb/GSF2183 --bind /N/slate/ealamb/GSF2183/genome --bind /N/slate/ealamb/GSF2183/sailor/workflow_sailor/scripts --bind /N/slate/ealamb/GSF2183/sailor/workflow_sailor --bind /N/slate/ealamb/GSF2183/results/6flareM' -j1
+samtools merge -@ 8 /N/scratch/ealamb/GSF4595/adr2_s_merged.bam adr2_s_rep1.Aligned.sortedByCoord.out.dedup.bam adr2_s_rep2.Aligned.sortedByCoord.out.dedup.bam adr2_s_rep3.Aligned.sortedByCoord.out.dedup.bam
+samtools merge -@ 8 /N/scratch/ealamb/GSF4595/adr2_f_merged.bam adr2_f_rep1.Aligned.sortedByCoord.out.dedup.bam adr2_f_rep2.Aligned.sortedByCoord.out.dedup.bam adr2_f_rep3.Aligned.sortedByCoord.out.dedup.bam
 
 
-python3 annotator.sailor.py --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.gtf --fwd GSF2183WTmerged.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --rev GSF2183WTmerged.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --wb c.elegans.WS275.annotation.final.bed --o /N/slate/ealamb/GSF2183/sailor/WTmerged.annotated.sites.csv
-python3 annotator.sailor.py --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.gtf --fwd GSF21836merged.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --rev GSF21836merged.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --wb c.elegans.WS275.annotation.final.bed --o /N/slate/ealamb/GSF2183/sailor/6merged.annotated.sites.csv
+module load apptainer/1.3.6
+
+snakemake \
+  --snakefile /N/scratch/ealamb/GSF4595/sailor/workflow_sailor/Snakefile \
+  --configfile /N/scratch/ealamb/GSF4595/sailor/wt_s.json \
+  --use-apptainer \
+  --cores 4
 
 
-python3 newannotator.py --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.gtf --fwd GSF2183WTmerged.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --rev GSF2183WTmerged.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --wb c.elegans.WS275.annotation.final.bed --o /N/slate/ealamb/GSF2183/sailor/newannotationWTmerged.annotated.sites.csv
-python3 newannotator.py --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.gtf --fwd GSF21836merged.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --rev GSF21836merged.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed --wb c.elegans.WS275.annotation.final.bed --o /N/slate/ealamb/GSF2183/sailor/newannotation6merged.annotated.sites.csv
+python3 annotator.sailor.py \
+  --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.refseq.gtf \
+  --fwd results/7_scored_outputs/adr2_s_merged.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --rev results/7_scored_outputs/adr2_s_merged.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --wb c.elegans.WS275.name_to_wbgene.fixed.csv \
+  --o /N/scratch/ealamb/GSF4595/sailor/results/adr2_s_merged.annotated.sites.csv
 
 
-scp ealamb@quartz.uits.iu.edu:/N/slate/ealamb/GSF1440_1/results/flareM205/*.csv ~/Desktop/
+python3 annotator.sailor.py \
+  --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.refseq.gtf \
+  --fwd results/7_scored_outputs/adr2_f_merged.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --rev results/7_scored_outputs/adr2_f_merged.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --wb c.elegans.WS275.name_to_wbgene.fixed.csv \
+  --o /N/scratch/ealamb/GSF4595/sailor/results/adr2_f_merged.annotated.sites.csv
+
+python3 annotator.sailor.py \
+  --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.refseq.gtf \
+  --fwd results/7_scored_outputs/wt_s_rep1.Aligned.sortedByCoord.out.dedup.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --rev results/7_scored_outputs/wt_s_rep1.Aligned.sortedByCoord.out.dedup.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --wb c.elegans.WS275.name_to_wbgene.fixed.csv \
+  --o /N/scratch/ealamb/GSF4595/sailor/results/wt_s_rep1.annotated.sites.csv
+
+python3 annotator.sailor.py \
+  --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.refseq.gtf \
+  --fwd results/7_scored_outputs/wt_s_rep2.Aligned.sortedByCoord.out.dedup.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --rev results/7_scored_outputs/wt_s_rep2.Aligned.sortedByCoord.out.dedup.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --wb c.elegans.WS275.name_to_wbgene.fixed.csv \
+  --o /N/scratch/ealamb/GSF4595/sailor/results/wt_s_rep2.annotated.sites.csv
+
+python3 annotator.sailor.py \
+  --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.refseq.gtf \
+  --fwd results/7_scored_outputs/wt_s_rep3.Aligned.sortedByCoord.out.dedup.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --rev results/7_scored_outputs/wt_s_rep3.Aligned.sortedByCoord.out.dedup.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --wb c.elegans.WS275.name_to_wbgene.fixed.csv \
+  --o /N/scratch/ealamb/GSF4595/sailor/results/wt_s_rep3.annotated.sites.csv
+
+python3 annotator.sailor.py \
+  --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.refseq.gtf \
+  --fwd results/7_scored_outputs/wt_f_rep3.Aligned.sortedByCoord.out.dedup.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --rev results/7_scored_outputs/wt_f_rep3.Aligned.sortedByCoord.out.dedup.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --wb c.elegans.WS275.name_to_wbgene.fixed.csv \
+  --o /N/scratch/ealamb/GSF4595/sailor/results/wt_f_rep3.annotated.sites.csv
+
+python3 annotator.sailor.py \
+  --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.refseq.gtf \
+  --fwd results/7_scored_outputs/wt_f_rep2.Aligned.sortedByCoord.out.dedup.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --rev results/7_scored_outputs/wt_f_rep2.Aligned.sortedByCoord.out.dedup.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --wb c.elegans.WS275.name_to_wbgene.fixed.csv \
+  --o /N/scratch/ealamb/GSF4595/sailor/results/wt_f_rep2.annotated.sites.csv
+
+python3 annotator.sailor.py \
+  --gtf c_elegans.PRJNA13758.WS275.canonical_geneset.refseq.gtf \
+  --fwd results/7_scored_outputs/wt_f_rep1.Aligned.sortedByCoord.out.dedup.bam.fwd.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --rev results/7_scored_outputs/wt_f_rep1.Aligned.sortedByCoord.out.dedup.bam.rev.readfiltered.formatted.varfiltered.snpfiltered.ranked.bed \
+  --wb c.elegans.WS275.name_to_wbgene.fixed.csv \
+  --o /N/scratch/ealamb/GSF4595/sailor/results/wt_f_rep1.annotated.sites.csv
+
+
