@@ -1,0 +1,52 @@
+STAR \
+  --runThreadN 3 \
+  --runMode genomeGenerate \
+  --genomeDir genome_index_STAR_r1 \
+  --genomeFastaFiles caenorhabditis_elegans.PRJNA13758.WBPS18.genomic.fa \
+  --sjdbGTFfile caenorhabditis_elegans.PRJNA13758.WBPS18.canonical_geneset.gtf \
+  --sjdbOverhang 99
+
+STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix ctrl_1 --readFilesIn ctrl_1_R01.fastq ctrl_1_R02.fastq --outSJfilterReads Unique
+$ STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix ctrl_2 --readFilesIn ctrl_2_R01.fastq ctrl_2_R02.fastq --outSJfilterReads Unique
+STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix ctrl_3 --readFilesIn ctrl_3_R01.fastq ctrl_3_R02.fastq --outSJfilterReads Unique
+STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix treat_1 --readFilesIn treat_1_R01.fastq treat_1_R02.fastq --outSJfilterReads Unique
+STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix treat_2 --readFilesIn treat_2_R01.fastq treat_2_R02.fastq --outSJfilterReads Unique
+STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix treat_3 --readFilesIn treat_3_R01.fastq treat_3_R02.fastq --outSJfilterReads Unique
+$ mkdir 1st_SJ
+$ mv *SJ.out.tab 1st_SJ
+$ mv *Log.final.out 1st_SJ
+$ mv *Log.progress.out 1st_SJ
+$ mv *Log.out 1st_SJ
+$ rm *Aligned.out.sam
+
+fasterq-dump SRR24086913.sra --split-files --threads 4 --outdir /N/scratch/ealamb/Norris_jum/genome
+
+
+
+STAR \
+  --runThreadN 3 \
+  --genomeDir genome_index_STAR_r1 \
+  --outFileNamePrefix ctrl_1 \
+  --readFilesIn SRR24086912_1.fastq SRR24086912_2.fastq \
+  --outSJfilterReads Unique \
+  --outSAMstrandField intronMotif \
+  --outFilterMultimapNmax 1 \
+  --sjdbFileChrStartEnd \
+    1st_SJ/ctrl_1SJ.out.tab \
+    1st_SJ/ctrl_2SJ.out.tab \
+    1st_SJ/ctrl_3SJ.out.tab \
+    1st_SJ/treat_1SJ.out.tab \
+    1st_SJ/treat_2SJ.out.tab \
+    1st_SJ/treat_3SJ.out.tab
+
+$ STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix ctrl_1 --readFilesIn ctrl_1_R01.fastq ctrl_1_R02.fastq --outSJfilterReads Unique --outSAMstrandField intronMotif --outFilterMultimapNmax 1 -sjdbFileChrStartEnd 1st_SJ/ctrl_1SJ.out.tab 1st_SJ/ctrl_2SJ.out.tab 1st_SJ/ctrl_3SJ.out.tab 1st_SJ/treat_1SJ.out.tab 1st_SJ/treat_2SJ.out.tab 1st_SJ/treat_3SJ.out.tab
+$ STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix ctrl_2 --readFilesIn ctrl_2_R01.fastq ctrl_2_R02.fastq --outSJfilterReads Unique --outSAMstrandField intronMotif --outFilterMultimapNmax 1 -sjdbFileChrStartEnd 1st_SJ/ctrl_1SJ.out.tab 1st_SJ/ctrl_2SJ.out.tab 1st_SJ/ctrl_3SJ.out.tab 1st_SJ/treat_1SJ.out.tab 1st_SJ/treat_2SJ.out.tab 1st_SJ/treat_3SJ.out.tab
+$ STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix ctrl_3 --readFilesIn ctrl_3_R01.fastq ctrl_3_R02.fastq --outSJfilterReads Unique --outSAMstrandField intronMotif --outFilterMultimapNmax 1 -sjdbFileChrStartEnd 1st_SJ/ctrl_1SJ.out.tab 1st_SJ/ctrl_2SJ.out.tab 1st_SJ/ctrl_3SJ.out.tab 1st_SJ/treat_1SJ.out.tab 1st_SJ/treat_2SJ.out.tab 1st_SJ/treat_3SJ.out.tab
+$ STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix treat_1 --readFilesIn treat_1_R01.fastq treat_1_R02.fastq --outSJfilterReads Unique --outSAMstrandField intronMotif --outFilterMultimapNmax 1 -sjdbFileChrStartEnd 1st_SJ/ctrl_1SJ.out.tab 1st_SJ/ctrl_2SJ.out.tab 1st_SJ/ctrl_3SJ.out.tab 1st_SJ/treat_1SJ.out.tab 1st_SJ/treat_2SJ.out.tab 1st_SJ/treat_3SJ.out.tab
+$ STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix treat_2 --readFilesIn treat_2_R01.fastq treat_2_R02.fastq --outSJfilterReads Unique --outSAMstrandField intronMotif --outFilterMultimapNmax 1 -sjdbFileChrStartEnd 1st_SJ/ctrl_1SJ.out.tab 1st_SJ/ctrl_2SJ.out.tab 1st_SJ/ctrl_3SJ.out.tab 1st_SJ/treat_1SJ.out.tab 1st_SJ/treat_2SJ.out.tab 1st_SJ/treat_3SJ.out.tab
+$ STAR --runThreadN 3 --genomeDir genome_index_STAR_r1 --outFileNamePrefix treat_3 --readFilesIn treat_3_R01.fastq treat_3_R02.fastq --outSJfilterReads Unique --outSAMstrandField intronMotif --outFilterMultimapNmax 1 -sjdbFileChrStartEnd 1st_SJ/ctrl_1SJ.out.tab 1st_SJ/ctrl_2SJ.out.tab 1st_SJ/ctrl_3SJ.out.tab 1st_SJ/treat_1SJ.out.tab 1st_SJ/treat_2SJ.out.tab 1st_SJ/treat_3SJ.out.tab
+
+
+
+
+
