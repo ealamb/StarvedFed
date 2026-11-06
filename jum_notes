@@ -80,3 +80,58 @@ bedtools coverage \
     -b treat_1Aligned.out.bam \
     -d \
     > treat_1Aligned.out_intron_coverage.txt
+
+
+
+
+
+
+# 1. Sort by read name
+samtools sort -n -@ 4 \
+  -o ctrl_1.name_sorted.bam ctrl_1Aligned.out.bam
+
+# 2. Add mate tags needed by markdup
+samtools fixmate -m -@ 4 \
+  ctrl_1.name_sorted.bam ctrl_1.fixmate.bam
+
+# 3. Sort by genomic coordinates
+samtools sort -@ 4 \
+  -o ctrl_1.fixmate.sorted.bam ctrl_1.fixmate.bam
+
+# 4. Identify duplicates and report statistics
+samtools markdup -s \
+  ctrl_1.fixmate.sorted.bam ctrl_1.marked.bam
+
+
+# 1. Sort by read name
+samtools sort -n -@ 4 \
+  -o treat_1.name_sorted.bam treat_1Aligned.out.bam
+
+# 2. Add mate tags needed by markdup
+samtools fixmate -m -@ 4 \
+  treat_1.name_sorted.bam treat_1.fixmate.bam
+
+# 3. Sort by genomic coordinates
+samtools sort -@ 4 \
+  -o treat_1.fixmate.sorted.bam treat_1.fixmate.bam
+
+# 4. Identify duplicates and report statistics
+samtools markdup -s \
+  treat_1.fixmate.sorted.bam treat_1.marked.bam
+
+
+# 1. Sort by read name
+samtools sort -n -@ 4 \
+  -o ctrl_2.name_sorted.bam ctrl_2Aligned.out.bam
+
+# 2. Add mate tags needed by markdup
+samtools fixmate -m -@ 4 \
+  ctrl_2.name_sorted.bam ctrl_2.fixmate.bam
+
+# 3. Sort by genomic coordinates
+samtools sort -@ 4 \
+  -o ctrl_2.fixmate.sorted.bam ctrl_2.fixmate.bam
+
+# 4. Identify duplicates and report statistics
+samtools markdup -s \
+  ctrl_2.fixmate.sorted.bam ctrl_2.marked.bam
